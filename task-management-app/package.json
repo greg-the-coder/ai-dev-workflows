@@ -1,0 +1,27 @@
+{
+  "name": "task-management-app",
+  "version": "1.0.0",
+  "description": "Task management web application with AWS CDK",
+  "scripts": {
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && python3 -m pip install -r requirements.txt -t .",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && python3 -m pytest",
+    "test:frontend": "cd frontend && npm test",
+    "dev:frontend": "cd frontend && npm start",
+    "synth": "cd infrastructure && npx cdk synth",
+    "deploy": "cd infrastructure && npx cdk deploy --all",
+    "deploy:frontend": "cd infrastructure && npx cdk deploy TaskManagementFrontendStack",
+    "destroy": "cd infrastructure && npx cdk destroy --all",
+    "bootstrap": "cd infrastructure && npx cdk bootstrap"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "workspaces": [
+    "infrastructure",
+    "frontend"
+  ]
+}
