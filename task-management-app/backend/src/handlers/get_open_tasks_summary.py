@@ -6,10 +6,12 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from services.dynamodb_service import DynamoDBService
+from services.logger import structured_log, get_correlation_id
 
 def handler(event, context):
     """Lambda handler for getting open tasks summary by priority"""
-    
+    correlation_id = get_correlation_id(event)
+
     # CORS headers
     headers = {
         'Content-Type': 'application/json',
@@ -17,7 +19,7 @@ def handler(event, context):
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
     }
-    
+
     try:
         # Handle preflight OPTIONS request
         if event.get('httpMethod') == 'OPTIONS':
@@ -26,25 +28,27 @@ def handler(event, context):
                 'headers': headers,
                 'body': ''
             }
-        
+
         # Get open tasks grouped by priority
         db_service = DynamoDBService()
         tasks_by_priority = db_service.get_open_tasks_by_priority()
-        
+
         # Create summary with counts and task details
         summary = {}
         total_open_tasks = 0
-        
+
         for priority in ['high', 'medium', 'low']:
             tasks = tasks_by_priority.get(priority, [])
             task_count = len(tasks)
             total_open_tasks += task_count
-            
+
             summary[priority] = {
                 'count': task_count,
                 'tasks': [task.to_dict() for task in tasks]
             }
-        
+
+        structured_log('INFO', 'Open tasks summary retrieved', correlation_id, total_open_tasks=total_open_tasks)
+
         return {
             'statusCode': 200,
             'headers': headers,
@@ -58,9 +62,9 @@ def handler(event, context):
                 }
             })
         }
-    
+
     except Exception as e:
-        print(f"Error in get_open_tasks_summary handler: {str(e)}")
+        structured_log('ERROR', 'Unhandled exception in get_open_tasks_summary handler', correlation_id, error=str(e))
         return {
             'statusCode': 500,
             'headers': headers,

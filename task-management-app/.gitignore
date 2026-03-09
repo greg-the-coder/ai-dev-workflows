@@ -69,3 +69,10 @@ yarn-error.log*
 
 # AWS
 .aws/
+
+# Vendored Python dependencies (install via requirements.txt instead)
+backend/boto3/
+backend/botocore/
+backend/s3transfer/
+backend/bin/
+backend/*.dist-info/
