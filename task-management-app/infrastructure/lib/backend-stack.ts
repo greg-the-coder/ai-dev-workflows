@@ -3,10 +3,12 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 
 interface BackendStackProps extends cdk.StackProps {
   table: dynamodb.Table;
+  allowedOrigins: string[];
 }
 
 export class TaskManagementBackendStack extends cdk.Stack {
@@ -14,6 +16,35 @@ export class TaskManagementBackendStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: BackendStackProps) {
     super(scope, id, props);
+
+    // Cognito User Pool
+    const userPool = new cognito.UserPool(this, 'TaskManagementUserPool', {
+      userPoolName: 'TaskManagementUserPool',
+      selfSignUpEnabled: false,
+      autoVerify: { email: true },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+    });
+
+    // Cognito User Pool Client
+    const userPoolClient = new cognito.UserPoolClient(this, 'TaskManagementUserPoolClient', {
+      userPool,
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+      },
+    });
+
+    // Cognito Authorizer
+    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'CognitoAuthorizer', {
+      cognitoUserPools: [userPool],
+    });
 
     // Lambda execution role
     const lambdaRole = new iam.Role(this, 'TaskManagementLambdaRole', {
@@ -93,7 +124,7 @@ export class TaskManagementBackendStack extends cdk.Stack {
       restApiName: 'Task Management API',
       description: 'API for task management application',
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: props.allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key'],
       },
@@ -103,26 +134,44 @@ export class TaskManagementBackendStack extends cdk.Stack {
     const tasksResource = this.api.root.addResource('tasks');
     
     // POST /tasks - Create task
-    tasksResource.addMethod('POST', new apigateway.LambdaIntegration(createTaskFunction));
+    tasksResource.addMethod('POST', new apigateway.LambdaIntegration(createTaskFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
     
     // GET /tasks - Get all tasks
-    tasksResource.addMethod('GET', new apigateway.LambdaIntegration(getTasksFunction));
+    tasksResource.addMethod('GET', new apigateway.LambdaIntegration(getTasksFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // Individual task operations
     const taskResource = tasksResource.addResource('{taskId}');
-    taskResource.addMethod('PUT', new apigateway.LambdaIntegration(updateTaskFunction));
-    taskResource.addMethod('DELETE', new apigateway.LambdaIntegration(deleteTaskFunction));
+    taskResource.addMethod('PUT', new apigateway.LambdaIntegration(updateTaskFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+    taskResource.addMethod('DELETE', new apigateway.LambdaIntegration(deleteTaskFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // Summary endpoints
     const summaryResource = this.api.root.addResource('summary');
     
     // GET /summary/open-tasks - Get open tasks summary by priority
     const openTasksResource = summaryResource.addResource('open-tasks');
-    openTasksResource.addMethod('GET', new apigateway.LambdaIntegration(getOpenTasksSummaryFunction));
+    openTasksResource.addMethod('GET', new apigateway.LambdaIntegration(getOpenTasksSummaryFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
     
     // GET /summary/completed-tasks - Get completed tasks by date
     const completedTasksResource = summaryResource.addResource('completed-tasks');
-    completedTasksResource.addMethod('GET', new apigateway.LambdaIntegration(getCompletedTasksFunction));
+    completedTasksResource.addMethod('GET', new apigateway.LambdaIntegration(getCompletedTasksFunction), {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // Output API URL
     new cdk.CfnOutput(this, 'ApiUrl', {

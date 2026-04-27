@@ -22,6 +22,7 @@ const databaseStack = new TaskManagementDatabaseStack(app, 'TaskManagementDataba
 // Backend stack (depends on database)
 const backendStack = new TaskManagementBackendStack(app, 'TaskManagementBackendStack', {
   table: databaseStack.tasksTable,
+  allowedOrigins: ['https://taskmanagement.example.com', 'https://www.taskmanagement.example.com'],
   env: {
     account: account,
     region: region,
@@ -29,14 +30,14 @@ const backendStack = new TaskManagementBackendStack(app, 'TaskManagementBackendS
 });
 
 // Frontend stack (depends on backend API)
-const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFrontendStack', {
-  apiUrl: backendStack.api.url,
-  env: {
-    account: account,
-    region: region,
-  },
-});
+// const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFrontendStack', {
+//   apiUrl: backendStack.api.url,
+//   env: {
+//     account: account,
+//     region: region,
+//   },
+// });
 
 // Add dependencies
 backendStack.addDependency(databaseStack);
-frontendStack.addDependency(backendStack);
+// frontendStack.addDependency(backendStack);
