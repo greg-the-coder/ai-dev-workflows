@@ -25,6 +25,7 @@ export class TaskManagementFrontendStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
     });
 
     // Origin Access Identity for CloudFront
