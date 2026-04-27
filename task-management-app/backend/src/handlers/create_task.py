@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from services.dynamodb_service import DynamoDBService
 from models.task import Task
+from utils.validation import validate_task_input
 
 def handler(event, context):
     """Lambda handler for creating a new task"""
@@ -38,28 +39,29 @@ def handler(event, context):
         
         body = json.loads(event['body'])
         
-        # Validate required fields
-        if 'description' not in body:
+        # Validate and sanitize input using validation module
+        validated_data, error_msg = validate_task_input(body)
+        
+        if error_msg:
+            return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps({'error': error_msg})
+            }
+        
+        if 'description' not in validated_data:
             return {
                 'statusCode': 400,
                 'headers': headers,
                 'body': json.dumps({'error': 'Description is required'})
             }
         
-        # Create task object
+        # Create task object with validated and sanitized data
         task = Task(
             task_id='',  # Will be auto-generated
-            description=body['description'],
-            priority=body.get('priority', 'medium').lower()
+            description=validated_data['description'],
+            priority=validated_data.get('priority', 'medium')
         )
-        
-        # Validate priority
-        if task.priority not in ['high', 'medium', 'low']:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'Priority must be high, medium, or low'})
-            }
         
         # Save to DynamoDB
         db_service = DynamoDBService()

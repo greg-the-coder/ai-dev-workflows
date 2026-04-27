@@ -7,6 +7,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from services.dynamodb_service import DynamoDBService
+from utils.validation import validate_task_input
 
 def handler(event, context):
     """Lambda handler for updating a task"""
@@ -47,24 +48,28 @@ def handler(event, context):
         
         body = json.loads(event['body'])
         
-        # Prepare updates
+        # Validate and sanitize input using validation module
+        validated_data, error_msg = validate_task_input(body)
+        
+        if error_msg:
+            return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps({'error': error_msg})
+            }
+        
+        # Prepare updates with validated and sanitized data
         updates = {}
         
-        if 'description' in body:
-            updates['description'] = body['description']
+        if 'description' in validated_data:
+            updates['description'] = validated_data['description']
         
-        if 'priority' in body:
-            priority = body['priority'].lower()
-            if priority not in ['high', 'medium', 'low']:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({'error': 'Priority must be high, medium, or low'})
-                }
-            updates['priority'] = priority
+        if 'priority' in validated_data:
+            updates['priority'] = validated_data['priority']
         
-        if 'completed' in body:
-            if body['completed']:
+        if 'completed' in validated_data:
+            completed = validated_data['completed']
+            if completed:
                 updates['completion_status'] = 'completed'
                 updates['completion_date'] = datetime.utcnow().isoformat()
             else:
