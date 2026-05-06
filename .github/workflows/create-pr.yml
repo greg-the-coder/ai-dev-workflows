@@ -1,0 +1,49 @@
+name: Create PR for Security Remediation
+on:
+  push:
+    branches:
+      - 'feature/add-input-validation-and-rate-limiting'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if PR already exists
+          EXISTING=$(gh pr list --head feature/add-input-validation-and-rate-limiting --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already exists"
+            exit 0
+          fi
+          gh pr create \
+            --title "Security: Add input validation, sanitization, and API rate limiting" \
+            --base master \
+            --head feature/add-input-validation-and-rate-limiting \
+            --body "$(cat <<'BODY'
+          ## Summary
+
+          Security remediation addressing Well-Architected Review findings:
+
+          - **Backend Input Validation**: Added max 500-char description length, HTML tag stripping for XSS prevention, UUID v4 validation on taskId path parameters, and sanitized error responses (internal errors logged server-side only)
+          - **API Rate Limiting**: API Gateway stage-level throttling (50 req/s steady, 100 burst), method-level throttling on write endpoints (POST/PUT/DELETE: 20 req/s), UsagePlan, Lambda reserved concurrency limits (10 for writes, 20 for reads), AWS WAF WebACL with AWSManagedRulesCommonRuleSet + IP-based rate limiting
+          - **Frontend Hardening**: Content-Security-Policy meta tag, client-side input length validation matching backend 500-char constraint
+
+          ## Test plan
+          - [ ] CDK synth passes cleanly
+          - [ ] Input validation returns proper 400 errors for oversized/malicious input
+          - [ ] XSS payloads are stripped from task descriptions
+          - [ ] Invalid UUID taskIds are rejected with 400
+          - [ ] Rate limiting activates under load testing
+          - [ ] WAF blocks common attack patterns (SQLi, XSS)
+
+          Generated with [Claude Code](https://claude.com/claude-code)
+          BODY
+          )"
