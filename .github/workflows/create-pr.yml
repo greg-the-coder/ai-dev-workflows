@@ -1,4 +1,4 @@
-name: Create PR for Security Remediation
+name: Create PR
 on:
   push:
     branches:
@@ -13,32 +13,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create Pull Request
+        with:
+          fetch-depth: 0
+      - name: Create Pull Request via API
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          EXISTING=$(gh pr list --head feature/add-input-validation-and-rate-limiting --json number --jq '.[0].number' 2>/dev/null || true)
-          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
-            echo "PR #$EXISTING already exists"
+          # Check if PR already exists
+          PR_EXISTS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:feature/add-input-validation-and-rate-limiting&state=open" | jq length)
+          
+          if [ "$PR_EXISTS" -gt "0" ]; then
+            echo "PR already exists"
             exit 0
           fi
-          gh pr create \
-            --title "Security: Add input validation, sanitization, and API rate limiting" \
-            --base master \
-            --head feature/add-input-validation-and-rate-limiting \
-            --body "## Summary
           
-          Security remediation addressing Well-Architected Review findings:
-          
-          - **Backend Input Validation**: Added max 500-char description length, HTML tag stripping for XSS prevention, UUID v4 validation on taskId path parameters, sanitized error responses
-          - **API Rate Limiting**: API Gateway throttling (50 req/s steady, 100 burst), method-level throttling on write endpoints (20 req/s), Lambda reserved concurrency, AWS WAF WebACL with AWSManagedRulesCommonRuleSet
-          - **Frontend Hardening**: Content-Security-Policy meta tag, client-side input length validation
-          
-          ## Test plan
-          - [ ] CDK synth passes cleanly
-          - [ ] Input validation returns proper 400 errors
-          - [ ] XSS payloads stripped from descriptions
-          - [ ] Invalid UUID taskIds rejected
-          - [ ] Rate limiting active under load
-          
-          Generated with [Claude Code](https://claude.com/claude-code)"
+          # Create PR via REST API
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls" \
+            -d '{
+              "title": "Security: Add input validation, sanitization, and API rate limiting",
+              "head": "feature/add-input-validation-and-rate-limiting",
+              "base": "master",
+              "body": "## Summary\n\nSecurity remediation addressing Well-Architected Review findings:\n\n- **Backend Input Validation**: Max 500-char description, HTML tag stripping for XSS prevention, UUID v4 validation on taskId, sanitized error responses\n- **API Rate Limiting**: API Gateway throttling (50 req/s steady, 100 burst), write endpoint throttling (20 req/s), Lambda reserved concurrency, AWS WAF WebACL with AWSManagedRulesCommonRuleSet\n- **Frontend Hardening**: Content-Security-Policy meta tag, client-side input length validation\n\n## Test plan\n- [ ] CDK synth passes cleanly\n- [ ] Input validation returns 400 for oversized/malicious input\n- [ ] XSS payloads stripped\n- [ ] Invalid UUID taskIds rejected\n- [ ] Rate limiting works under load\n\nGenerated with [Claude Code](https://claude.com/claude-code)"
+            }'
