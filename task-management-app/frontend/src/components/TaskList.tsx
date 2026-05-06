@@ -26,6 +26,8 @@ import { Add, Edit, Delete, Check, Undo } from '@mui/icons-material';
 import { Task, CreateTaskRequest, UpdateTaskRequest } from '../types/Task';
 import { TaskAPI } from '../services/api';
 
+const MAX_DESCRIPTION_LENGTH = 500;
+
 const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -247,7 +249,14 @@ const TaskList: React.FC = () => {
             fullWidth
             variant="outlined"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) => {
+              if (e.target.value.length <= MAX_DESCRIPTION_LENGTH) {
+                setFormData({ ...formData, description: e.target.value });
+              }
+            }}
+            inputProps={{ maxLength: MAX_DESCRIPTION_LENGTH }}
+            helperText={`${formData.description.length}/${MAX_DESCRIPTION_LENGTH} characters`}
+            error={formData.description.length >= MAX_DESCRIPTION_LENGTH}
             sx={{ mb: 2 }}
           />
           <FormControl fullWidth variant="outlined">
