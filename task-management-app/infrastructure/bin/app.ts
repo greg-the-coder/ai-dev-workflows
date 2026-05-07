@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { TaskManagementBackendStack } from '../lib/backend-stack';
-import { TaskManagementFrontendStack } from '../lib/frontend-stack';
+import { TaskManagementFrontendInfraStack, TaskManagementFrontendDeployStack } from '../lib/frontend-stack';
 import { TaskManagementDatabaseStack } from '../lib/database-stack';
 
 const app = new cdk.App();
@@ -11,32 +11,30 @@ const app = new cdk.App();
 const account = '816024705881';
 const region = 'us-east-1';
 
-// Database stack (foundational)
-const databaseStack = new TaskManagementDatabaseStack(app, 'TaskManagementDatabaseStack', {
-  env: {
-    account: account,
-    region: region,
-  },
-});
+const env = { account, region };
 
-// Backend stack (depends on database)
+// Database stack (foundational)
+const databaseStack = new TaskManagementDatabaseStack(app, 'TaskManagementDatabaseStack', { env });
+
+// Frontend infrastructure stack (S3 + CloudFront) - created early so backend can reference the CF domain
+const frontendInfraStack = new TaskManagementFrontendInfraStack(app, 'TaskManagementFrontendInfraStack', { env });
+
+// Backend stack (depends on database and frontend infra for CloudFront domain)
 const backendStack = new TaskManagementBackendStack(app, 'TaskManagementBackendStack', {
   table: databaseStack.tasksTable,
-  env: {
-    account: account,
-    region: region,
-  },
+  cloudFrontDomainName: frontendInfraStack.distribution.distributionDomainName,
+  env,
 });
 
-// Frontend stack (depends on backend API)
-const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFrontendStack', {
+// Frontend deploy stack (deploys assets after backend is ready)
+const frontendDeployStack = new TaskManagementFrontendDeployStack(app, 'TaskManagementFrontendDeployStack', {
+  bucket: frontendInfraStack.bucket,
+  distribution: frontendInfraStack.distribution,
   apiUrl: backendStack.api.url,
-  env: {
-    account: account,
-    region: region,
-  },
+  env,
 });
 
 // Add dependencies
 backendStack.addDependency(databaseStack);
-frontendStack.addDependency(backendStack);
+backendStack.addDependency(frontendInfraStack);
+frontendDeployStack.addDependency(backendStack);

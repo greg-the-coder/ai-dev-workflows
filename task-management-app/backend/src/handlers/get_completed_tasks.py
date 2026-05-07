@@ -9,15 +9,17 @@ from services.dynamodb_service import DynamoDBService
 
 def handler(event, context):
     """Lambda handler for getting completed tasks by date"""
-    
+
+    allowed_origin = os.environ.get('ALLOWED_ORIGIN', '')
+
     # CORS headers
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowed_origin,
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
     }
-    
+
     try:
         # Handle preflight OPTIONS request
         if event.get('httpMethod') == 'OPTIONS':
@@ -26,22 +28,22 @@ def handler(event, context):
                 'headers': headers,
                 'body': ''
             }
-        
+
         # Get query parameters
         query_params = event.get('queryStringParameters') or {}
         limit = int(query_params.get('limit', 50))
-        
+
         # Validate limit
         if limit < 1 or limit > 100:
             limit = 50
-        
+
         # Get completed tasks sorted by completion date
         db_service = DynamoDBService()
         completed_tasks = db_service.get_completed_tasks_by_date(limit)
-        
+
         # Convert tasks to dictionaries and group by date
         tasks_data = [task.to_dict() for task in completed_tasks]
-        
+
         # Group tasks by completion date (YYYY-MM-DD format)
         tasks_by_date = {}
         for task in tasks_data:
@@ -51,10 +53,10 @@ def handler(event, context):
                 if completion_date not in tasks_by_date:
                     tasks_by_date[completion_date] = []
                 tasks_by_date[completion_date].append(task)
-        
+
         # Sort dates in descending order (newest first)
         sorted_dates = sorted(tasks_by_date.keys(), reverse=True)
-        
+
         return {
             'statusCode': 200,
             'headers': headers,
@@ -66,7 +68,7 @@ def handler(event, context):
                 'limit': limit
             })
         }
-    
+
     except ValueError:
         return {
             'statusCode': 400,

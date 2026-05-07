@@ -5,15 +5,13 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 
-interface FrontendStackProps extends cdk.StackProps {
-  apiUrl: string;
-}
+interface FrontendInfraStackProps extends cdk.StackProps {}
 
-export class TaskManagementFrontendStack extends cdk.Stack {
+export class TaskManagementFrontendInfraStack extends cdk.Stack {
   public readonly distribution: cloudfront.Distribution;
   public readonly bucket: s3.Bucket;
 
-  constructor(scope: Construct, id: string, props: FrontendStackProps) {
+  constructor(scope: Construct, id: string, props?: FrontendInfraStackProps) {
     super(scope, id, props);
 
     // S3 bucket for hosting static website
@@ -64,14 +62,6 @@ export class TaskManagementFrontendStack extends cdk.Stack {
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
 
-    // Deploy frontend build to S3
-    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
-      sources: [s3deploy.Source.asset('../frontend/build')],
-      destinationBucket: this.bucket,
-      distribution: this.distribution,
-      distributionPaths: ['/*'],
-    });
-
     // Outputs
     new cdk.CfnOutput(this, 'WebsiteURL', {
       value: `https://${this.distribution.distributionDomainName}`,
@@ -86,6 +76,26 @@ export class TaskManagementFrontendStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DistributionId', {
       value: this.distribution.distributionId,
       description: 'CloudFront distribution ID',
+    });
+  }
+}
+
+interface FrontendDeployStackProps extends cdk.StackProps {
+  bucket: s3.IBucket;
+  distribution: cloudfront.IDistribution;
+  apiUrl: string;
+}
+
+export class TaskManagementFrontendDeployStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: FrontendDeployStackProps) {
+    super(scope, id, props);
+
+    // Deploy frontend build to S3
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+      sources: [s3deploy.Source.asset('../frontend/build')],
+      destinationBucket: props.bucket,
+      distribution: props.distribution,
+      distributionPaths: ['/*'],
     });
 
     new cdk.CfnOutput(this, 'ApiUrl', {

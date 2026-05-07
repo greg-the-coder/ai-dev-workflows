@@ -9,15 +9,17 @@ from services.dynamodb_service import DynamoDBService
 
 def handler(event, context):
     """Lambda handler for deleting a task"""
-    
+
+    allowed_origin = os.environ.get('ALLOWED_ORIGIN', '')
+
     # CORS headers
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowed_origin,
         'Access-Control-Allow-Methods': 'DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
     }
-    
+
     try:
         # Handle preflight OPTIONS request
         if event.get('httpMethod') == 'OPTIONS':
@@ -26,7 +28,7 @@ def handler(event, context):
                 'headers': headers,
                 'body': ''
             }
-        
+
         # Get task ID from path parameters
         task_id = event.get('pathParameters', {}).get('taskId')
         if not task_id:
@@ -35,11 +37,11 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': 'Task ID is required'})
             }
-        
+
         # Delete task from DynamoDB
         db_service = DynamoDBService()
         result = db_service.delete_task(task_id)
-        
+
         if result['success']:
             return {
                 'statusCode': 200,
@@ -55,7 +57,7 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': f'Failed to delete task: {result["error"]}'})
             }
-    
+
     except Exception as e:
         print(f"Error in delete_task handler: {str(e)}")
         return {
