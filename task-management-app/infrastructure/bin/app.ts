@@ -19,18 +19,18 @@ const databaseStack = new TaskManagementDatabaseStack(app, 'TaskManagementDataba
   },
 });
 
-// Backend stack (depends on database)
-const backendStack = new TaskManagementBackendStack(app, 'TaskManagementBackendStack', {
-  table: databaseStack.tasksTable,
+// Frontend stack (creates CloudFront distribution)
+const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFrontendStack', {
   env: {
     account: account,
     region: region,
   },
 });
 
-// Frontend stack (depends on backend API)
-const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFrontendStack', {
-  apiUrl: backendStack.api.url,
+// Backend stack (depends on database and frontend for CloudFront domain)
+const backendStack = new TaskManagementBackendStack(app, 'TaskManagementBackendStack', {
+  table: databaseStack.tasksTable,
+  cloudFrontDomainName: frontendStack.distribution.distributionDomainName,
   env: {
     account: account,
     region: region,
@@ -39,4 +39,4 @@ const frontendStack = new TaskManagementFrontendStack(app, 'TaskManagementFronte
 
 // Add dependencies
 backendStack.addDependency(databaseStack);
-frontendStack.addDependency(backendStack);
+backendStack.addDependency(frontendStack);

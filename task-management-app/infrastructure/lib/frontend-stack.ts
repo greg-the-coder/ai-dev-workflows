@@ -5,15 +5,11 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
 
-interface FrontendStackProps extends cdk.StackProps {
-  apiUrl: string;
-}
-
 export class TaskManagementFrontendStack extends cdk.Stack {
   public readonly distribution: cloudfront.Distribution;
   public readonly bucket: s3.Bucket;
 
-  constructor(scope: Construct, id: string, props: FrontendStackProps) {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // S3 bucket for hosting static website
@@ -86,11 +82,6 @@ export class TaskManagementFrontendStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DistributionId', {
       value: this.distribution.distributionId,
       description: 'CloudFront distribution ID',
-    });
-
-    new cdk.CfnOutput(this, 'ApiUrl', {
-      value: props.apiUrl,
-      description: 'Backend API URL for frontend configuration',
     });
   }
 }

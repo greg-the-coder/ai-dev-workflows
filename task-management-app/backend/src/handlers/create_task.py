@@ -10,15 +10,17 @@ from models.task import Task
 
 def handler(event, context):
     """Lambda handler for creating a new task"""
-    
+
+    allowed_origin = os.environ.get('ALLOWED_ORIGIN', 'https://localhost')
+
     # CORS headers
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowed_origin,
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
     }
-    
+
     try:
         # Handle preflight OPTIONS request
         if event.get('httpMethod') == 'OPTIONS':
@@ -27,7 +29,7 @@ def handler(event, context):
                 'headers': headers,
                 'body': ''
             }
-        
+
         # Parse request body
         if 'body' not in event or not event['body']:
             return {
@@ -35,9 +37,9 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': 'Request body is required'})
             }
-        
+
         body = json.loads(event['body'])
-        
+
         # Validate required fields
         if 'description' not in body:
             return {
@@ -45,14 +47,14 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': 'Description is required'})
             }
-        
+
         # Create task object
         task = Task(
             task_id='',  # Will be auto-generated
             description=body['description'],
             priority=body.get('priority', 'medium').lower()
         )
-        
+
         # Validate priority
         if task.priority not in ['high', 'medium', 'low']:
             return {
@@ -60,11 +62,11 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': 'Priority must be high, medium, or low'})
             }
-        
+
         # Save to DynamoDB
         db_service = DynamoDBService()
         result = db_service.create_task(task)
-        
+
         if result['success']:
             return {
                 'statusCode': 201,
@@ -80,7 +82,7 @@ def handler(event, context):
                 'headers': headers,
                 'body': json.dumps({'error': f'Failed to create task: {result["error"]}'})
             }
-    
+
     except json.JSONDecodeError:
         return {
             'statusCode': 400,
