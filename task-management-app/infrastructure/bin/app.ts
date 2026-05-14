@@ -7,9 +7,9 @@ import { TaskManagementDatabaseStack } from '../lib/database-stack';
 
 const app = new cdk.App();
 
-// Use explicit environment or defaults
-const account = '816024705881';
-const region = 'us-east-1';
+// Use CDK context or environment variables instead of hardcoded values
+const account = app.node.tryGetContext('account') || process.env.CDK_DEFAULT_ACCOUNT;
+const region = app.node.tryGetContext('region') || process.env.CDK_DEFAULT_REGION || 'us-east-1';
 
 // Database stack (foundational)
 const databaseStack = new TaskManagementDatabaseStack(app, 'TaskManagementDatabaseStack', {

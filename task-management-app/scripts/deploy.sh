@@ -37,7 +37,7 @@ npx cdk bootstrap
 
 # Deploy infrastructure
 echo "☁️  Deploying infrastructure..."
-npx cdk deploy --all --require-approval never
+npx cdk deploy --all
 
 echo "✅ Deployment completed successfully!"
 echo ""
