@@ -53,7 +53,7 @@ def handler(event, context):
             return {
                 'statusCode': 500,
                 'headers': headers,
-                'body': json.dumps({'error': f'Failed to delete task: {result["error"]}'})
+                'body': json.dumps({'error': 'Failed to delete task'})
             }
     
     except Exception as e:

@@ -16,7 +16,8 @@ export class TaskManagementDatabaseStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // Use RETAIN for production
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      deletionProtection: true,
       pointInTimeRecovery: true,
     });
 
