@@ -4,37 +4,46 @@ on:
     branches:
       - 'feature/add-cognito-api-gateway-auth'
 
-permissions: write-all
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   open-pr:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: pulls } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: `${context.repo.owner}:feature/add-cognito-api-gateway-auth`,
-              state: 'open'
-            });
+      - name: Check for existing PR
+        id: check
+        run: |
+          PR_COUNT=$(gh pr list --head "feature/add-cognito-api-gateway-auth" --json number --jq length 2>/dev/null || echo "0")
+          echo "count=$PR_COUNT" >> $GITHUB_OUTPUT
+      - name: Create Pull Request
+        if: steps.check.outputs.count == '0'
+        run: |
+          gh pr create \
+            --title "Security: Add Cognito User Pool authentication to API Gateway" \
+            --base master \
+            --head feature/add-cognito-api-gateway-auth \
+            --body "## Summary
 
-            if (pulls.length > 0) {
-              console.log(`PR already exists: #${pulls[0].number}`);
-              return;
-            }
+          Security remediation adding authentication and authorization to all API Gateway endpoints:
 
-            const { data: pr } = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Security: Add Cognito User Pool authentication to API Gateway',
-              head: 'feature/add-cognito-api-gateway-auth',
-              base: 'master',
-              body: `## Summary\n\nSecurity remediation adding authentication and authorization to all API Gateway endpoints:\n\n- **Cognito User Pool**: Added User Pool with email sign-in, strong password policy, and auto-verification\n- **Cognito User Pool Client**: Configured with USER_PASSWORD and USER_SRP auth flows\n- **API Gateway Authorizer**: CognitoUserPoolsAuthorizer applied to all endpoints (POST /tasks, GET /tasks, PUT /tasks/{taskId}, DELETE /tasks/{taskId}, GET /summary/*)\n- **CORS Restriction**: Replaced wildcard '*' origin with CloudFront distribution domain\n- **Lambda CORS Update**: All handlers now use ALLOWED_ORIGIN environment variable instead of hardcoded wildcard\n\n## Test plan\n- [ ] CDK synth passes cleanly\n- [ ] All API methods require valid Cognito JWT in Authorization header\n- [ ] Unauthenticated requests return 401\n- [ ] CORS headers only allow CloudFront domain origin\n- [ ] OPTIONS preflight requests work correctly\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)`
-            });
+          - **Cognito User Pool**: Added User Pool with email sign-in, strong password policy, and auto-verification
+          - **Cognito User Pool Client**: Configured with USER_PASSWORD and USER_SRP auth flows
+          - **API Gateway Authorizer**: CognitoUserPoolsAuthorizer applied to all endpoints (POST /tasks, GET /tasks, PUT /tasks/{taskId}, DELETE /tasks/{taskId}, GET /summary/*)
+          - **CORS Restriction**: Replaced wildcard '*' origin with CloudFront distribution domain
+          - **Lambda CORS Update**: All handlers now use ALLOWED_ORIGIN environment variable instead of hardcoded wildcard
 
-            console.log(`PR created: ${pr.html_url}`);
+          ## Test plan
+          - [ ] CDK synth passes cleanly
+          - [ ] All API methods require valid Cognito JWT in Authorization header
+          - [ ] Unauthenticated requests return 401
+          - [ ] CORS headers only allow CloudFront domain origin
+          - [ ] OPTIONS preflight requests work correctly
+
+          Generated with [Claude Code](https://claude.com/claude-code)"
