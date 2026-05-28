@@ -13,33 +13,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create Pull Request via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # First enable the workflow token to create PRs
-          curl -s -X PUT \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/permissions/workflow" \
-            -d '{"can_approve_pull_request_reviews":true}' || true
-
-          # Check if PR already exists
-          EXISTING=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:feature/add-cognito-api-gateway-auth&state=open" | jq length)
-          
-          if [ "$EXISTING" -gt "0" ]; then
-            echo "PR already exists"
-            exit 0
-          fi
-
-          # Create the PR
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ github.repository }}/pulls" \
             -d '{
               "title": "Security: Add Cognito User Pool authentication to API Gateway",
               "head": "feature/add-cognito-api-gateway-auth",
               "base": "master",
-              "body": "## Summary\n\nSecurity remediation adding authentication and authorization to all API Gateway endpoints:\n\n- **Cognito User Pool**: Added User Pool with email sign-in, strong password policy, and auto-verification\n- **Cognito User Pool Client**: Configured with USER_PASSWORD and USER_SRP auth flows\n- **API Gateway Authorizer**: CognitoUserPoolsAuthorizer applied to all endpoints (POST /tasks, GET /tasks, PUT /tasks/{taskId}, DELETE /tasks/{taskId}, GET /summary/*)\n- **CORS Restriction**: Replaced wildcard '\\''*'\\'' origin with CloudFront distribution domain\n- **Lambda CORS Update**: All handlers now use ALLOWED_ORIGIN environment variable instead of hardcoded wildcard\n\n## Test plan\n- [ ] CDK synth passes cleanly\n- [ ] All API methods require valid Cognito JWT in Authorization header\n- [ ] Unauthenticated requests return 401\n- [ ] CORS headers only allow CloudFront domain origin\n- [ ] OPTIONS preflight requests work correctly\n\nGenerated with [Claude Code](https://claude.com/claude-code)"
-            }'
+              "body": "## Summary\n\nSecurity remediation adding authentication and authorization to all API Gateway endpoints:\n\n- **Cognito User Pool**: Added User Pool with email sign-in, strong password policy, and auto-verification\n- **Cognito User Pool Client**: Configured with USER_PASSWORD and USER_SRP auth flows\n- **API Gateway Authorizer**: CognitoUserPoolsAuthorizer applied to all endpoints (POST /tasks, GET /tasks, PUT /tasks/{taskId}, DELETE /tasks/{taskId}, GET /summary/*)\n- **CORS Restriction**: Replaced wildcard * origin with CloudFront distribution domain\n- **Lambda CORS Update**: All handlers now use ALLOWED_ORIGIN environment variable instead of hardcoded wildcard\n\n## Test plan\n- [ ] CDK synth passes cleanly\n- [ ] All API methods require valid Cognito JWT in Authorization header\n- [ ] Unauthenticated requests return 401\n- [ ] CORS headers only allow CloudFront domain origin\n- [ ] OPTIONS preflight requests work correctly\n\nGenerated with [Claude Code](https://claude.com/claude-code)"
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Failed to create PR. HTTP $HTTP_CODE: $BODY"
+            exit 1
+          fi
+
+          PR_URL=$(echo "$BODY" | jq -r '.html_url // empty')
+          echo "PR created: $PR_URL"
